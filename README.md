@@ -31,3 +31,5 @@ cargo build --release
 - Clips under 2 minutes are skipped
 
 (self note - time spend: 4h 20mins)
+## License
+  MIT - license
