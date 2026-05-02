@@ -1,5 +1,7 @@
+use std::io;
+
 use walkdir::WalkDir;
-#[derive(Debug)]
+//#[derive(Debug)]
 struct Clip{
     name: String,
     path: std::path::PathBuf,
@@ -35,19 +37,20 @@ fn read_clips(clip_path: &str)-> Vec<Clip>{
 
 fn get_size(clips: &Vec<Clip>)-> f64{
     let total_size: u64 = clips.iter().map(|c| c.size).sum();
-    let total_mb: f64 = (total_size) as f64 / 1024.0 / 1024.0;
-    let total_gb = (total_size) as f64 / 1024.0 / 1024.0 / 1024.0;
-    println!("Total: {:.1} MB", total_mb);
-    println!("Total: {:.1} GB", total_gb);
-    total_mb
+    (total_size) as f64 / 1024.0 / 1024.0
 }
 
 fn delete_clips(clips: &mut Vec<Clip>, target: f64){
-    let i = 0;
+    let mut i = 0;
     while i < clips.len() {
         let size = get_size(clips);
         if size > target {
+            if clips[i].length < (120) as f64{
+                i += 1;
+                continue;
+            }
             std::fs::remove_file(&clips[i].path).expect("Failed to delete");
+            println!("Deleted file: {}", &clips[i].name);
             clips.remove(i);
         } else {
             break;
@@ -56,9 +59,38 @@ fn delete_clips(clips: &mut Vec<Clip>, target: f64){
 }
 
 fn main() {
-    let mut clips = read_clips("D:/unknown");
+    //let mut clips = read_clips("D:/unknown");
     //println!("{:?}", &clips);
-    clips.sort_by(|a, b| a.date_modified.cmp(&b.date_modified));
+    //clips.sort_by(|a, b| a.date_modified.cmp(&b.date_modified));
     //get_size(&clips);
-    delete_clips(&mut clips, (3000) as f64);
+    //delete_clips(&mut clips, (3000) as f64);
+
+
+    println!("||Clip space manager||");
+
+    println!("Folder to delete from: ");
+    let mut target_path = String::new();
+    io::stdin().read_line(&mut target_path).expect("Failed to read line");
+    let target_path = target_path.trim();
+
+    println!("Target size (GB):");
+    let mut target_size = String::new();
+    io::stdin().read_line(&mut target_size).expect("Failed to read line");
+    let target_size_gb: f64 = target_size.trim().parse().expect("Failed to parse");
+
+    println!("Your setting: \n - Target folder: {}\n - Target size: {}GB", &target_path, &target_size_gb);
+    println!("Are you sure you want to continue? (y/n)");
+    let mut safety_check = String::new();
+    io::stdin().read_line(&mut safety_check).expect("Failed to read line");
+    if safety_check.trim() == "y"{
+        let mut clips = read_clips(&target_path);
+        clips.sort_by(|a, b| a.date_modified.cmp(&b.date_modified));
+        //get_size(&clips);
+        delete_clips(&mut clips, target_size_gb*1024.0);
+        let current_size = (get_size(&read_clips(target_path)))/1024.0;
+        println!("\nRemaining space: {:.1}", current_size);
+    }
+    else {
+        println!("Failed confirmaion");
+    }
 }
