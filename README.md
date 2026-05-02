@@ -32,4 +32,4 @@ cargo build --release
 
 (self note - time spend: 4h 20mins)
 ## License
- - this is a licensed project - read more in the license
+ - under MIT license
