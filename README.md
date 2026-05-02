@@ -29,4 +29,5 @@ cargo build --release
 - Deletion is **permanent** — no recycle bin
 - Clips are deleted oldest-first
 - Clips under 2 minutes are skipped
-(sefl note - time spend: 4h 20mins)
+
+(self note - time spend: 4h 20mins)
