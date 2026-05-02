@@ -12,6 +12,7 @@ struct Clip{
 }
 
 fn read_clips(clip_path: &str) -> Vec<Clip> {
+    
     let paths: Vec<_> = WalkDir::new(clip_path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -61,16 +62,33 @@ fn delete_clips(clips: &mut Vec<Clip>, target: f64){
 fn main() {
     println!("||Clip space manager||");
 
-    println!("Folder to delete from: ");
-    let mut target_path = String::new();
-    io::stdin().read_line(&mut target_path).expect("Failed to read line");
-    let target_path = target_path.trim();
+    let target_path = loop{
+        let mut ask_target_path=String::new();
 
-    println!("Target size (GB):");
-    let mut target_size = String::new();
-    io::stdin().read_line(&mut target_size).expect("Failed to read line");
-    let target_size_gb: f64 = target_size.trim().parse().expect("Failed to parse");
-
+        println!("Folder to delete from: ");
+        
+        io::stdin().read_line(&mut ask_target_path).expect("Failed to read line");
+        let target_path = ask_target_path.trim().to_string();
+        if std::path::Path::new(&target_path).exists() {
+            break target_path;
+        }
+        println!("Invalid path");
+    };
+    
+    let target_size_gb = loop{
+        println!("Target size (GB):");
+        let mut target_size = String::new();
+        io::stdin().read_line(&mut target_size).expect("Failed to read line");
+        match target_size.trim().parse::<f64>(){
+            Ok(value)=>break value,
+            Err(_)=>{
+                println!("Not a valid number");
+                continue;
+            }
+        };
+    };
+    
+    
     println!("Your setting: \n - Target folder: {}\n - Target size: {}GB", &target_path, &target_size_gb);
     println!("Are you sure you want to continue? (y/n)");
     let mut safety_check = String::new();
@@ -79,7 +97,7 @@ fn main() {
         let mut clips = read_clips(&target_path);
         clips.sort_by(|a, b| a.date_modified.cmp(&b.date_modified));
         delete_clips(&mut clips, target_size_gb*1024.0);
-        let current_size = (get_size(&read_clips(target_path)))/1024.0;
+        let current_size = (get_size(&clips))/1024.0;
         println!("\nRemaining space: {:.1}", current_size);
     }
     else {
