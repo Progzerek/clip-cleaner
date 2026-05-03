@@ -20,6 +20,7 @@ Run the executable and follow the prompts:
 
 ## Build
 
+ - Download the release, build it yourself with: 
 ```bash
 cargo build --release
 ```
