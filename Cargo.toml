@@ -7,3 +7,6 @@ edition = "2024"
 walkdir = "2.5.0"
 ffprobe = "0.4"
 rayon = "1"
+[profile.samply]
+inherits = "release"
+debug = true

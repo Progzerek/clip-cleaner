@@ -92,7 +92,7 @@ fn delete_clips(clips: Vec<Clip>){
     }
 }
 
-
+/*
 fn main() {
     println!("||Clip space manager||");
 
@@ -141,11 +141,10 @@ fn main() {
         println!("Failed confirmaion");
     }
 }
+*/
 
 
-/*
 fn main() {
-    let deleted = calculate_deleted("D:/unknown", 2000.0);
+    let deleted = calculate_deleted("D:/unknown", 0.0);
     delete_clips(deleted);
 }
-*/
