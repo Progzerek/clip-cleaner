@@ -29,8 +29,8 @@ cargo build --release
 
 - Deletion is **permanent** — no recycle bin
 - Clips are deleted oldest-first
+- The tool reads clips in subfolders too
 - Clips under 2 minutes are skipped
 
-(self note - time spend: 5h mins)
-## License
- - under MIT license
+(self note - time spend: 5h 20mins)
+## MIT License
