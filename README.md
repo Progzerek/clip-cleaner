@@ -10,7 +10,7 @@ Scans a folder (recursively) for `.mp4` files, sorts them oldest-first, and dele
 
 Run the executable and follow the prompts:
 
-1. Enter the folder path to clean (e.g. `D:/AMD clipps`)
+1. Enter the folder path to clean (e.g. `D:/YourClipsFolder`)
 2. Enter your target size in GB
 3. Confirm with `y`
 
@@ -20,7 +20,7 @@ Run the executable and follow the prompts:
 
 ## Build
 
- - Download the release, build it yourself with: 
+ - Download the release, or build it yourself with: 
 ```bash
 cargo build --release
 ```
