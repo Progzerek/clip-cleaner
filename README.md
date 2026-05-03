@@ -31,6 +31,6 @@ cargo build --release
 - Clips are deleted oldest-first
 - Clips under 2 minutes are skipped
 
-(self note - time spend: 4h 20mins)
+(self note - time spend: 5h mins)
 ## License
  - under MIT license
