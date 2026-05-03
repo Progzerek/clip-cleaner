@@ -45,12 +45,13 @@ fn get_size(clips: &Vec<Clip>)-> f64{
 }
 
 fn calculate_deleted(clip_path: &str, target: f64)-> Vec<Clip>{
+    let lengh_treshold = 120.0;
     let mut to_delete_clips = read_clips(clip_path);
     to_delete_clips.sort_by(|a, b| a.date_modified.cmp(&b.date_modified));
     let mut current_size = get_size(&to_delete_clips);
     to_delete_clips.retain(|clip| {
         if current_size > target{
-            if clip.length < 120.0{false}
+            if clip.length < lengh_treshold{false}
             else {
                 current_size -= ((clip.size) as f64)/1024.0/1024.0;
                 true
@@ -63,25 +64,7 @@ fn calculate_deleted(clip_path: &str, target: f64)-> Vec<Clip>{
     to_delete_clips
 
 }
-/*
-fn delete_clips(mut clips: Vec<Clip>, target: f64){
-    let mut i = 0;
-    while i < clips.len() {
-        let size = get_size(&clips);
-        if size > target {
-            if clips[i].length < (120) as f64{
-                i += 1;
-                continue;
-            }
-            std::fs::remove_file(&clips[i].path).expect("Failed to delete");
-            println!("Deleted file: {}", &clips[i].name);
-            clips.remove(i);
-        } else {
-            break;
-        }
-    }
-}
-*/
+
 fn delete_clips(clips: Vec<Clip>){
     for file in clips{
         match std::fs::remove_file(&file.path) {
@@ -92,7 +75,7 @@ fn delete_clips(clips: Vec<Clip>){
     }
 }
 
-/*
+
 fn main() {
     println!("||Clip space manager||");
 
@@ -141,10 +124,11 @@ fn main() {
         println!("Failed confirmaion");
     }
 }
-*/
 
 
+/* 
 fn main() {
     let deleted = calculate_deleted("D:/unknown", 0.0);
     delete_clips(deleted);
 }
+*/
