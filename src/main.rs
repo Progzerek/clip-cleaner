@@ -242,7 +242,15 @@ fn render(frame: &mut Frame, app: &mut App) {
                 .add_modifier(Modifier::BOLD);
             let items: Vec<ListItem> = app.items        //TODO: redo it for clips vec
                 .iter()
-                .map(|s| ListItem::new(s.name.as_str()))
+                .map(|s| {
+                    let row = format!(
+                        "{:<50} {:>8.1} MB  {:>6.0}s",
+                        s.name,
+                        s.size as f64 / 1024.0 / 1024.0,
+                        s.length
+                    );
+                    ListItem::new(row)
+                })
                 .collect();
 
             let list = List::new(items)
