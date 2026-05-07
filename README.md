@@ -10,7 +10,7 @@ Scans a folder (recursively) for `.mp4` files, sorts them oldest-first, and dele
 
 Run the executable and follow the prompts:
 
-1. Enter the folder path to clean (e.g. `D:/AMD clipps`)
+1. Enter the folder path to clean (e.g. `D:/YourClipsFolder`)
 2. Enter your target size in GB
 3. Confirm with `y`
 
@@ -20,6 +20,7 @@ Run the executable and follow the prompts:
 
 ## Build
 
+ - Download the release, or build it yourself with: 
 ```bash
 cargo build --release
 ```
@@ -28,8 +29,8 @@ cargo build --release
 
 - Deletion is **permanent** — no recycle bin
 - Clips are deleted oldest-first
+- The tool reads clips in subfolders too
 - Clips under 2 minutes are skipped
 
-(self note - time spend: 4h 20mins)
-## License
- - under MIT license
+(self note - time spend: 5h 20mins)
+## MIT License
