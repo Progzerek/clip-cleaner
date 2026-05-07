@@ -3,6 +3,14 @@ use walkdir::WalkDir;
 use rayon::prelude::*;
 use std::time::Instant;
 
+
+use ratatui::prelude::*;
+use ratatui::{DefaultTerminal, Frame};
+use ratatui::widgets::*;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+//
+// Cleaner logic
+//
 #[derive(Debug)]
 
 struct Clip{
@@ -75,7 +83,7 @@ fn delete_clips(clips: Vec<Clip>){
     }
 }
 
-
+/* 
 fn main() {
     println!("||Clip space manager||");
 
@@ -123,12 +131,129 @@ fn main() {
     else {
         println!("Failed confirmaion");
     }
-}
+}*/
 
 
-/* 
-fn main() {
-    let deleted = calculate_deleted("D:/unknown", 0.0);
-    delete_clips(deleted);
+//
+// TUI
+//
+
+enum Screen {
+    AskPath,
+    MainSrc,
+    Quit
 }
-*/
+
+struct App{
+    items: Vec<Clip>,
+    path: String,
+    list_state: ListState,
+    state: Screen
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>>{
+    ratatui::run(app)?;
+    Ok(())
+}
+
+fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
+    let mut clip_app=App{
+        items: Vec::new(),
+        path: String::new(),
+        list_state: ListState::default(),
+        state: Screen::AskPath,
+        
+    };
+    loop {
+        terminal.draw(|frame| {render(frame, &mut clip_app);})?;
+
+        if let Event::Key(key) = event::read()? && key.kind == KeyEventKind::Press{
+            match clip_app.state {
+                Screen::AskPath=>{
+                    match key.code {
+                        KeyCode::Char(char)=>{
+                            clip_app.path.push(char);
+                        }
+                        KeyCode::Backspace=>{
+                            clip_app.path.pop();
+                        }
+                        KeyCode::Enter=>{
+                            if std::path::Path::new(&clip_app.path).exists() {
+                                clip_app.items = read_clips(&clip_app.path);
+                                clip_app.state = Screen::MainSrc;
+                            }
+                        }
+                        _=>{}
+                    }
+                }
+                Screen::MainSrc=> match key.code {
+                    KeyCode::Down => {
+                        let current = match clip_app.list_state.selected(){
+                            None=> 0,
+                            Some(value)=>value
+                        };
+                        let last_index = clip_app.items.len();
+                        let new = (current+1).min(last_index-1);
+                        clip_app.list_state.select(Some(new))
+                    }
+                    KeyCode::Up   => {
+                        let current = match clip_app.list_state.selected(){
+                            None=> 0,
+                            Some(value)=>value
+                        };
+                        let new = current.saturating_sub(1);
+                        clip_app.list_state.select(Some(new))
+                    }
+                    KeyCode::Char('q') => clip_app.state=Screen::Quit,
+                    _ => {}
+                }
+                Screen::Quit=>{
+                    match key.code {
+                        KeyCode::Char('y')=> break Ok(()),
+                        KeyCode::Char('n')=> clip_app.state=Screen::MainSrc,
+                        _ => {} // ignore everything else
+                    }
+                }
+            }
+        }
+    }
+}
+fn render(frame: &mut Frame, app: &mut App) {
+    match app.state {
+        Screen::AskPath => {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),  // label
+                    Constraint::Length(1),  // input
+                ])
+                .split(frame.area());
+
+            let label = Line::from("Path to delete from:");
+            frame.render_widget(label.centered(), chunks[0]);
+
+            let path = Line::from(app.path.as_str());
+            frame.render_widget(path.centered(), chunks[1]);
+        }
+        Screen::MainSrc=>{
+            let highlight = Style::default()
+                .bg(Color::Blue)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD);
+            let items: Vec<ListItem> = app.items        //TODO: redo it for clips vec
+                .iter()
+                .map(|s| ListItem::new(s.name.as_str()))
+                .collect();
+
+            let list = List::new(items)
+                .highlight_style(highlight);
+
+            frame.render_stateful_widget(list, frame.area(), &mut app.list_state);
+        }
+        Screen::Quit=>{
+            let quit_text = Line::from("Are you sure you want to quit? (y/n)");
+            frame.render_widget(quit_text.centered(), frame.area());
+        }
+    }
+    
+}

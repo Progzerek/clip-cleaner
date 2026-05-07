@@ -7,6 +7,8 @@ edition = "2024"
 walkdir = "2.5.0"
 ffprobe = "0.4"
 rayon = "1"
+ratatui = "0.30.0"
+crossterm = "0.29.0"
 [profile.samply]
 inherits = "release"
 debug = true
