@@ -9,6 +9,7 @@ ffprobe = "0.4"
 rayon = "1"
 ratatui = "0.30.0"
 crossterm = "0.29.0"
+tui-input = "0.15.3"
 [profile.samply]
 inherits = "release"
 debug = true

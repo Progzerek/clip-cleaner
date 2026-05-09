@@ -3,10 +3,13 @@ use walkdir::WalkDir;
 use rayon::prelude::*;
 use std::time::Instant;
 
+use tui_input::Input;
+use tui_input::backend::crossterm::EventHandler;
 
 use ratatui::prelude::*;
 use ratatui::{DefaultTerminal, Frame};
 use ratatui::widgets::*;
+use ratatui::layout::Flex;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 //
 // Cleaner logic
@@ -140,15 +143,28 @@ fn main() {
 
 enum Screen {
     AskPath,
+    AskSize,
     MainSrc,
+    Delete,
     Quit
 }
 
 struct App{
     items: Vec<Clip>,
-    path: String,
     list_state: ListState,
-    state: Screen
+
+    to_delete: Vec<Clip>,
+    to_delete_state: ListState,
+
+    path_input: Input,
+    path: String,
+
+    current_size: Option<f64>,
+    target_size: Option<f64>,
+    target_size_input: Input,
+    
+    state: Screen,
+    
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>>{
@@ -159,9 +175,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>>{
 fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
     let mut clip_app=App{
         items: Vec::new(),
+        to_delete: Vec::new(),
+        to_delete_state: ListState::default(),
+        path_input: Input::default(),
         path: String::new(),
+        current_size: None,
+        target_size_input: Input::default(),
+        target_size: None,
         list_state: ListState::default(),
         state: Screen::AskPath,
+        
         
     };
     loop {
@@ -171,19 +194,17 @@ fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
             match clip_app.state {
                 Screen::AskPath=>{
                     match key.code {
-                        KeyCode::Char(char)=>{
-                            clip_app.path.push(char);
-                        }
-                        KeyCode::Backspace=>{
-                            clip_app.path.pop();
-                        }
-                        KeyCode::Enter=>{
+                        KeyCode::Enter => {
                             if std::path::Path::new(&clip_app.path).exists() {
                                 clip_app.items = read_clips(&clip_app.path);
+                                clip_app.current_size = Some(get_size(&clip_app.items));
                                 clip_app.state = Screen::MainSrc;
                             }
                         }
-                        _=>{}
+                        _ => {
+                            clip_app.path_input.handle_event(&Event::Key(key));
+                            clip_app.path = clip_app.path_input.value().to_string();
+                        }
                     }
                 }
                 Screen::MainSrc=> match key.code {
@@ -204,8 +225,47 @@ fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                         let new = current.saturating_sub(1);
                         clip_app.list_state.select(Some(new))
                     }
+                    KeyCode::F(1)=>clip_app.state=Screen::AskSize,
+                    KeyCode::F(10)=>{
+                        clip_app.to_delete = calculate_deleted(&clip_app.path, clip_app.target_size.unwrap());
+                        clip_app.state=Screen::Delete
+                    },
                     KeyCode::Char('q') => clip_app.state=Screen::Quit,
                     _ => {}
+                }
+                Screen::AskSize=>{
+                    match key.code {
+                        KeyCode::Enter => {
+                            if clip_app.target_size.is_some(){
+                                clip_app.state = Screen::MainSrc;
+                            }
+                            }
+                        _ => {
+                            clip_app.target_size_input.handle_event(&Event::Key(key));
+                            clip_app.target_size = clip_app.target_size_input.value().parse::<f64>().ok();
+                        }
+                    }
+                }
+                Screen::Delete=>{
+                    match key.code {
+                        KeyCode::Down => {
+                            let i = match clip_app.to_delete_state.selected() {
+                                None => 0,
+                                Some(v) => (v + 1).min(clip_app.to_delete.len().saturating_sub(1)),
+                            };
+                            clip_app.to_delete_state.select(Some(i));
+                        }
+                        KeyCode::Up => {
+                            let i = match clip_app.to_delete_state.selected() {
+                                None => 0,
+                                Some(v) => v.saturating_sub(1),
+                            };
+                            clip_app.to_delete_state.select(Some(i));
+                        }
+                        KeyCode::Char('y') => { /* delete and break */ }
+                        KeyCode::Char('n') => clip_app.state = Screen::MainSrc,
+                        _ => {}
+                    }
                 }
                 Screen::Quit=>{
                     match key.code {
@@ -232,15 +292,20 @@ fn render(frame: &mut Frame, app: &mut App) {
             let label = Line::from("Path to delete from:");
             frame.render_widget(label.centered(), chunks[0]);
 
-            let path = Line::from(app.path.as_str());
-            frame.render_widget(path.centered(), chunks[1]);
+            frame.set_cursor_position((
+                chunks[1].x + app.path_input.visual_cursor() as u16,
+                chunks[1].y,
+            ));
+
+            let input_widget = Paragraph::new(&*app.path);
+            frame.render_widget(input_widget, chunks[1]);
         }
         Screen::MainSrc=>{
             let highlight = Style::default()
                 .bg(Color::Blue)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD);
-            let items: Vec<ListItem> = app.items        //TODO: redo it for clips vec
+            let items: Vec<ListItem> = app.items
                 .iter()
                 .map(|s| {
                     let row = format!(
@@ -252,15 +317,94 @@ fn render(frame: &mut Frame, app: &mut App) {
                     ListItem::new(row)
                 })
                 .collect();
-
             let list = List::new(items)
                 .highlight_style(highlight);
 
-            frame.render_stateful_widget(list, frame.area(), &mut app.list_state);
+            let [header, body, footer] = Layout::vertical([
+                Constraint::Length(1
+                ),
+                Constraint::Fill(1),
+                Constraint::Length(1),
+            ]).areas(frame.area());
+
+            //header render
+            let [name_label, current_path] = Layout::horizontal([
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+            ]).areas(header);
+            frame.render_widget(Paragraph::new("Clip cleaner"), name_label);
+            frame.render_widget(Paragraph::new(format!("Current path: {}", app.path)).right_aligned(), current_path);
+            //body render
+            frame.render_stateful_widget(list, body, &mut app.list_state);
+            //feet render
+            let [add_target, delete, current_size] = Layout::horizontal([
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+            ]).flex(Flex::SpaceBetween).areas(footer);
+            
+            frame.render_widget(Paragraph::new(format!("F1 - add target: {}GB", match app.target_size{Some(value)=>value.to_string(), None=>String::from("")})).centered(), add_target);
+            frame.render_widget(Paragraph::new("F10 - procede delete").centered(), delete);
+
+            frame.render_widget(Paragraph::new(format!("Current size: {:.1}GB", &app.current_size.unwrap()/1024.0)).centered(), current_size);
         }
         Screen::Quit=>{
             let quit_text = Line::from("Are you sure you want to quit? (y/n)");
             frame.render_widget(quit_text.centered(), frame.area());
+        }
+        Screen::AskSize=>{
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),  // label
+                    Constraint::Length(1),  // input
+                ])
+                .split(frame.area());
+
+            let label = Line::from("Target size to delete (in GB): ");
+            frame.render_widget(label, chunks[0]);
+
+            frame.set_cursor_position((
+                chunks[1].x + app.target_size_input.visual_cursor() as u16,
+                chunks[1].y,
+            ));
+            let input_widget = Paragraph::new(format!("{}", app.target_size_input.value()));
+            frame.render_widget(input_widget, chunks[1]);
+        }
+        Screen::Delete=>{
+            let [overview, delete_listing] = Layout::vertical([
+                Constraint::Length(7),
+                Constraint::Fill(1),
+            ]).areas(frame.area());
+
+            frame.render_widget(Paragraph::new(format!("Delete overview
+        - Current Path: {}
+        - Current Size: {:.1} GB
+        - Target size: {:.1} GB\n
+    WARNING! THIS ACTION IS IRREVERSABLE! MAKE SURE YOU HAVE THE RIGHT SETTINGS BEFORE YOU CONTINUE!", app.path, app.current_size.unwrap()/1024.0, app.target_size.unwrap())), overview);
+
+            let highlight = Style::default()
+                .bg(Color::Blue)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD);
+            let items: Vec<ListItem> = app.to_delete
+                .iter()
+                .map(|s| {
+                    let row = format!(
+                        "{:<50} {:>8.1} MB  {:>6.0}s",
+                        s.name,
+                        s.size as f64 / 1024.0 / 1024.0,
+                        s.length
+                    );
+                    ListItem::new(row)
+                })
+                .collect();
+            let list = List::new(items)
+                .highlight_style(highlight);
+
+
+            frame.render_stateful_widget(list, delete_listing, &mut app.to_delete_state);
+
         }
     }
     
