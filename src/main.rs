@@ -76,11 +76,11 @@ fn calculate_deleted(clip_path: &str, target: f64)-> Vec<Clip>{
 
 }
 
-fn delete_clips(clips: Vec<Clip>){
+fn delete_clips(clips: &mut Vec<Clip>){
     for file in clips{
         match std::fs::remove_file(&file.path) {
-            Ok(_)=>println!("Deleted {}", &file.name),
-            Err(e)=>println!("Failed to delete {}:\n{}", &file.name, e)
+            Ok(_)=>continue,
+            Err(_)=>continue
         }
         
     }
@@ -145,7 +145,7 @@ enum Screen {
     AskPath,
     AskSize,
     MainSrc,
-    Delete,
+    ProcessDelete,
     Quit
 }
 
@@ -227,8 +227,13 @@ fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                     }
                     KeyCode::F(1)=>clip_app.state=Screen::AskSize,
                     KeyCode::F(10)=>{
-                        clip_app.to_delete = calculate_deleted(&clip_app.path, clip_app.target_size.unwrap());
-                        clip_app.state=Screen::Delete
+                        if clip_app.target_size.is_none(){
+                            clip_app.state = Screen::AskSize;
+                        }
+                        else{
+                            clip_app.to_delete = calculate_deleted(&clip_app.path, clip_app.target_size.unwrap());
+                            clip_app.state=Screen::ProcessDelete
+                        }
                     },
                     KeyCode::Char('q') => clip_app.state=Screen::Quit,
                     _ => {}
@@ -246,7 +251,7 @@ fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                         }
                     }
                 }
-                Screen::Delete=>{
+                Screen::ProcessDelete=>{
                     match key.code {
                         KeyCode::Down => {
                             let i = match clip_app.to_delete_state.selected() {
@@ -262,7 +267,7 @@ fn app(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
                             };
                             clip_app.to_delete_state.select(Some(i));
                         }
-                        KeyCode::Char('y') => { /* delete and break */ }
+                        KeyCode::Char('y') => {delete_clips(&mut clip_app.to_delete)},    // handle delete better pls
                         KeyCode::Char('n') => clip_app.state = Screen::MainSrc,
                         _ => {}
                     }
@@ -371,7 +376,7 @@ fn render(frame: &mut Frame, app: &mut App) {
             let input_widget = Paragraph::new(format!("{}", app.target_size_input.value()));
             frame.render_widget(input_widget, chunks[1]);
         }
-        Screen::Delete=>{
+        Screen::ProcessDelete=>{
             let [overview, delete_listing] = Layout::vertical([
                 Constraint::Length(7),
                 Constraint::Fill(1),
@@ -381,7 +386,8 @@ fn render(frame: &mut Frame, app: &mut App) {
         - Current Path: {}
         - Current Size: {:.1} GB
         - Target size: {:.1} GB\n
-    WARNING! THIS ACTION IS IRREVERSABLE! MAKE SURE YOU HAVE THE RIGHT SETTINGS BEFORE YOU CONTINUE!", app.path, app.current_size.unwrap()/1024.0, app.target_size.unwrap())), overview);
+    WARNING! THIS ACTION IS IRREVERSABLE! MAKE SURE YOU HAVE THE RIGHT SETTINGS BEFORE YOU CONTINUE!
+    Are you sure you want continue? (y/n)", app.path, app.current_size.unwrap()/1024.0, app.target_size.unwrap())), overview);
 
             let highlight = Style::default()
                 .bg(Color::Blue)
